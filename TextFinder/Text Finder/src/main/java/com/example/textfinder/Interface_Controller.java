@@ -5,9 +5,9 @@ import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ListView;
-import javafx.scene.control.MenuButton;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -17,8 +17,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.File;
-import javafx.scene.control.TextField;
 import java.net.URL;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -27,6 +27,14 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 import java.awt.Desktop;
+import javafx.event.ActionEvent;        // Para manejar eventos de acción como clics en botones
+import javafx.scene.Scene;            // Para manejar las escenas de la ventana
+import javafx.scene.control.Button;    // Para usar botones en la interfaz
+import javafx.scene.control.Label;     // Para mostrar etiquetas (como mensajes)
+import javafx.scene.control.TextField; // Para el campo de texto donde el usuario ingresa la clave
+import javafx.scene.layout.VBox;       // Para organizar los elementos en un contenedor vertical
+import javafx.stage.Modality;          // Para definir la modalidad de la ventana emergente
+import javafx.stage.Stage;
 
 public class Interface_Controller implements Initializable {
 
@@ -108,42 +116,73 @@ public class Interface_Controller implements Initializable {
         }
     }
 
-    public void btn_eliminar_doc(ActionEvent actionEvent) {
+    // DESENCRIPTAR ARCHIVO
+    public void btn_desencript_doc(ActionEvent actionEvent) {
+        // Crear una ventana emergente (modal) para ingresar la clave de desencriptación
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL); // Esto hace que la ventana sea modal
+        dialog.setTitle("Ingresar clave de desencriptación");
+
+        // Crear un Label y un TextField para que el usuario ingrese la clave
+        Label label = new Label("Por favor, ingrese la clave para desencriptar:");
+        TextField claveField = new TextField();
+
+        // Crear un botón que ejecutará la desencriptación
+        Button btnEjecutar = new Button("Desencriptar");
+
+        // Acción para ejecutar el algoritmo de desencriptación cuando se haga clic en el botón
+        btnEjecutar.setOnAction(event -> {
+            String claveIngresada = claveField.getText();
+            // Llamar al algoritmo de desencriptación con la clave proporcionada
+            //desencriptar(claveIngresada);
+            System.out.println("Desencriptar");
+            dialog.close(); // Cerrar la ventana después de ejecutar la desencriptación
+        });
+
+        // Crear el layout de la ventana emergente
+        VBox layout = new VBox(10);
+        layout.getChildren().addAll(label, claveField, btnEjecutar);
+
+        // Crear la escena para el diálogo
+        Scene scene = new Scene(layout, 300, 150);
+        dialog.setScene(scene);
+        dialog.showAndWait(); // Muestra la ventana y espera a que el usuario interactúe
+    }
+
+
+    // ENCRIPTAR ARCHIVO
+    public void btn_encript_doc(ActionEvent actionEvent) {
         // Obtener el índice del elemento seleccionado
         int selectedIndex = listview_biblioteca.getSelectionModel().getSelectedIndex();
         String nombreFile = listview_biblioteca.getSelectionModel().getSelectedItem();
-        System.out.println("Documento eliminado: " + nombreFile);
-        // Si se ha seleccionado un elemento, eliminarlo
+
         if (selectedIndex >= 0) {
-            // Eliminar el archivo de la lista
-            File archivoSeleccionado = lista_archivos.get(nombreFile);
-            lista_archivos.remove(archivoSeleccionado);
-            // Eliminar el nombre del archivo del ListView
-            listview_biblioteca.getItems().remove(selectedIndex);
+            // Crear una alerta de confirmación
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Confirmación de encriptación");
+            alert.setHeaderText("¿Estás seguro de que quieres encriptar este documento?");
+            alert.setContentText("Archivo: " + nombreFile);
+
+            // Mostrar la alerta y esperar la respuesta del usuario
+            Optional<ButtonType> result = alert.showAndWait();
+            if (result.isPresent() && result.get() == ButtonType.OK) {
+                // El usuario confirmó, procede con la encriptación
+                System.out.println("Encriptando el archivo: " + nombreFile);
+                // Desarrollo de encriptación aquí
+            } else {
+                // El usuario canceló la acción
+                System.out.println("Encriptación cancelada.");
+            }
+        } else {
+            // No hay ningún archivo seleccionado
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Advertencia");
+            alert.setHeaderText("Ningún archivo seleccionado");
+            alert.setContentText("Por favor, selecciona un archivo antes de continuar.");
+            alert.showAndWait();
         }
     }
 
-    public void btn_anadir_carpeta(ActionEvent actionEvent) {
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Seleccionar carpeta");
-        File selectedDirectory = directoryChooser.showDialog(null); //muestra el explorador
-        if (selectedDirectory != null) {
-            // Obtener la lista de archivos dentro de la carpeta seleccionada
-            File[] files = selectedDirectory.listFiles();
-            if (files != null) {
-                // Agregar los nombres de los archivos al ListView
-                for (File file : files) {
-                    if (file.isFile() && (file.getName().toLowerCase().endsWith(".docx") ||
-                            file.getName().toLowerCase().endsWith(".pdf") ||
-                            file.getName().toLowerCase().endsWith(".txt"))) {
-                        lista_archivos.add(file);
-                        listview_biblioteca.getItems().add(file.getName());
-                    }
-                }
-                System.out.println("carpeta añadida");
-            }
-        }
-    }
 
     public void btn_IndizarArchivos(ActionEvent actionEvent) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
