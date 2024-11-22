@@ -12,6 +12,8 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+
+import java.awt.datatransfer.Clipboard;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,6 +37,12 @@ import javafx.scene.control.TextField; // Para el campo de texto donde el usuari
 import javafx.scene.layout.VBox;       // Para organizar los elementos en un contenedor vertical
 import javafx.stage.Modality;          // Para definir la modalidad de la ventana emergente
 import javafx.stage.Stage;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import javax.crypto.SecretKey;
+import java.awt.*;
+import java.awt.datatransfer.StringSelection;
+
 
 public class Interface_Controller implements Initializable {
 
@@ -48,6 +56,7 @@ public class Interface_Controller implements Initializable {
     FileChooser.ExtensionFilter txt = new FileChooser.ExtensionFilter("Text Files (*.txt)", "*.txt");
     FileChooser.ExtensionFilter pdf = new FileChooser.ExtensionFilter("PDF Files (*.pdf)", "*.pdf");
     FileChooser.ExtensionFilter docx = new FileChooser.ExtensionFilter("Word Documents (*.docx)", "*.docx");
+    FileChooser.ExtensionFilter encrypted = new FileChooser.ExtensionFilter("Encrypted File (*.encrypted)", "*.encrypted");
 
     @FXML
     private ListView<String> listview_biblioteca;
@@ -90,7 +99,7 @@ public class Interface_Controller implements Initializable {
 
     public void btn_anadir_doc(ActionEvent actionEvent) {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.getExtensionFilters().addAll(txt, pdf, docx); //añade los filtros para escoger archivos
+        fileChooser.getExtensionFilters().addAll(txt, pdf, docx, encrypted); //añade los filtros para escoger archivos
         File selectedFile = fileChooser.showOpenDialog(null);
         if (selectedFile != null){
             lista_archivos.add(selectedFile);
@@ -118,36 +127,61 @@ public class Interface_Controller implements Initializable {
 
     // DESENCRIPTAR ARCHIVO
     public void btn_desencript_doc(ActionEvent actionEvent) {
-        // Crear una ventana emergente (modal) para ingresar la clave de desencriptación
-        Stage dialog = new Stage();
-        dialog.initModality(Modality.APPLICATION_MODAL); // Esto hace que la ventana sea modal
-        dialog.setTitle("Ingresar clave de desencriptación");
+        // Obtener el índice del elemento seleccionado
+        int selectedIndex = listview_biblioteca.getSelectionModel().getSelectedIndex();
+        String nombreFile = listview_biblioteca.getSelectionModel().getSelectedItem();
 
-        // Crear un Label y un TextField para que el usuario ingrese la clave
-        Label label = new Label("Por favor, ingrese la clave para desencriptar:");
-        TextField claveField = new TextField();
+        if (selectedIndex >= 0) {
+            File archivoSeleccionado = lista_archivos.get(nombreFile);
 
-        // Crear un botón que ejecutará la desencriptación
-        Button btnEjecutar = new Button("Desencriptar");
+            // Crear ventana emergente para ingresar clave
+            Stage dialog = new Stage();
+            dialog.initModality(Modality.APPLICATION_MODAL);
+            dialog.setTitle("Clave de desencriptación");
 
-        // Acción para ejecutar el algoritmo de desencriptación cuando se haga clic en el botón
-        btnEjecutar.setOnAction(event -> {
-            String claveIngresada = claveField.getText();
-            // Llamar al algoritmo de desencriptación con la clave proporcionada
-            //desencriptar(claveIngresada);
-            System.out.println("Desencriptar");
-            dialog.close(); // Cerrar la ventana después de ejecutar la desencriptación
-        });
+            Label label = new Label("Ingrese la clave para desencriptar:");
+            TextField claveField = new TextField();
+            Button btnEjecutar = new Button("Desencriptar");
 
-        // Crear el layout de la ventana emergente
-        VBox layout = new VBox(10);
-        layout.getChildren().addAll(label, claveField, btnEjecutar);
+            btnEjecutar.setOnAction(event -> {
+                String claveIngresada = claveField.getText();
 
-        // Crear la escena para el diálogo
-        Scene scene = new Scene(layout, 300, 150);
-        dialog.setScene(scene);
-        dialog.showAndWait(); // Muestra la ventana y espera a que el usuario interactúe
+                try {
+                    // Decodificar clave
+                    SecretKey secretKey = FileEncryptor.decodeKey(claveIngresada);
+
+                    // Leer contenido cifrado
+                    byte[] contenidoCifrado = Files.readAllBytes(archivoSeleccionado.toPath());
+
+                    // Descifrar contenido
+                    String contenidoDescifrado = FileEncryptor.decrypt(contenidoCifrado, secretKey);
+
+                    // Guardar el archivo descifrado
+                    String nuevoNombre = archivoSeleccionado.getName().replace(".encrypted", "_descifrado.txt");
+                    File archivoDescifrado = new File(archivoSeleccionado.getParent(), nuevoNombre);
+                    Files.write(archivoDescifrado.toPath(), contenidoDescifrado.getBytes());
+
+                    // Mostrar mensaje de éxito
+                    mostrarInformacion("Desencriptación completada", "Archivo desencriptado correctamente.");
+                    dialog.close();
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    mostrarError("Error al desencriptar", e.getMessage());
+                }
+            });
+
+            VBox layout = new VBox(10);
+            layout.getChildren().addAll(label, claveField, btnEjecutar);
+            Scene scene = new Scene(layout, 300, 150);
+            dialog.setScene(scene);
+            dialog.showAndWait();
+
+        } else {
+            mostrarAdvertencia("Advertencia", "Ningún archivo seleccionado", "Seleccione un archivo para continuar.");
+        }
     }
+
 
 
     // ENCRIPTAR ARCHIVO
@@ -157,31 +191,51 @@ public class Interface_Controller implements Initializable {
         String nombreFile = listview_biblioteca.getSelectionModel().getSelectedItem();
 
         if (selectedIndex >= 0) {
-            // Crear una alerta de confirmación
-            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-            alert.setTitle("Confirmación de encriptación");
-            alert.setHeaderText("¿Estás seguro de que quieres encriptar este documento?");
-            alert.setContentText("Archivo: " + nombreFile);
+            File archivoSeleccionado = lista_archivos.get(nombreFile);
 
-            // Mostrar la alerta y esperar la respuesta del usuario
-            Optional<ButtonType> result = alert.showAndWait();
-            if (result.isPresent() && result.get() == ButtonType.OK) {
-                // El usuario confirmó, procede con la encriptación
-                System.out.println("Encriptando el archivo: " + nombreFile);
-                // Desarrollo de encriptación aquí
-            } else {
-                // El usuario canceló la acción
-                System.out.println("Encriptación cancelada.");
+            try {
+                // Generar clave AES
+                String claveAES = FileEncryptor.generateKey();
+                SecretKey secretKey = FileEncryptor.decodeKey(claveAES);
+
+                // Determinar el tipo de archivo y leer su contenido
+                String extension = archivoSeleccionado.getName().substring(archivoSeleccionado.getName().lastIndexOf(".") + 1);
+                String contenido;
+                if (extension.equalsIgnoreCase("pdf")) {
+                    PDFParser parser = new PDFParser(archivoSeleccionado);
+                    contenido = parser.getParsedText();
+                } else if (extension.equalsIgnoreCase("txt")) {
+                    TextFileParser parser = new TextFileParser(archivoSeleccionado);
+                    contenido = parser.getTextContent();
+                } else {
+                    throw new IllegalArgumentException("Formato de archivo no soportado.");
+                }
+
+                // Cifrar el contenido
+                byte[] contenidoCifrado = FileEncryptor.encrypt(contenido, secretKey);
+
+                // Guardar el archivo cifrado
+                File archivoCifrado = new File(archivoSeleccionado.getParent(), archivoSeleccionado.getName() + ".encrypted");
+                Files.write(archivoCifrado.toPath(), contenidoCifrado);
+                // cpoiar la clave en el porta papeles
+                copiarPortaPapeles(claveAES);
+
+                // Mostrar clave al usuario
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Encriptación completada");
+                alert.setHeaderText("Archivo encriptado correctamente");
+                alert.setContentText("Clave de cifrado (Copiada en portapapeles):\n" + claveAES);
+                alert.showAndWait();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                mostrarError("Error al encriptar", e.getMessage());
             }
         } else {
-            // No hay ningún archivo seleccionado
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle("Advertencia");
-            alert.setHeaderText("Ningún archivo seleccionado");
-            alert.setContentText("Por favor, selecciona un archivo antes de continuar.");
-            alert.showAndWait();
+            mostrarAdvertencia("Advertencia", "Ningún archivo seleccionado", "Seleccione un archivo para continuar.");
         }
     }
+
 
 
     public void btn_IndizarArchivos(ActionEvent actionEvent) {
@@ -267,6 +321,47 @@ public class Interface_Controller implements Initializable {
 
         return false;
     }
+
+
+    private void mostrarInformacion(String titulo, String mensaje) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(titulo);
+        alert.setHeaderText(null);
+        alert.setContentText(mensaje);
+        alert.showAndWait(); // Muestra el cuadro de diálogo hasta que el usuario lo cierre
+    }
+
+    private void mostrarError(String titulo, String mensaje) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(titulo);         // Título de la ventana de error
+        alert.setHeaderText(null);
+        alert.setContentText(mensaje); // Contenido del mensaje de error
+        alert.showAndWait();            // Muestra el cuadro de diálogo hasta que el usuario lo cierre
+    }
+
+    private void mostrarAdvertencia(String titulo, String encabezado, String mensaje) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle(titulo);
+        alert.setHeaderText(encabezado);
+        alert.setContentText(mensaje);
+        alert.showAndWait();
+    }
+
+
+    private void copiarPortaPapeles(String texto){
+        // Crear un objeto StringSelection con el texto a copiar
+        StringSelection stringSelection = new StringSelection(texto);
+
+        // Obtener el portapapeles del sistema
+        Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+
+        // Establecer el texto en el portapapeles
+        ((Clipboard) clipboard).setContents(stringSelection, null);
+        System.out.println("Texto copiado al portapapeles: " + texto);
+    }
+
+
+
 
     private void mostrarContenidoArchivo(File archivo) {
         // Verificar si el archivo existe
@@ -360,7 +455,6 @@ public class Interface_Controller implements Initializable {
         RadixSort.sort(filesresults);
         actualizarListViewResults();
     }
-
 
 }
 
