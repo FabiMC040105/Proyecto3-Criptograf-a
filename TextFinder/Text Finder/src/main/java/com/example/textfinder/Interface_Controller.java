@@ -153,13 +153,13 @@ public class Interface_Controller implements Initializable {
                     // Leer contenido cifrado
                     byte[] contenidoCifrado = Files.readAllBytes(archivoSeleccionado.toPath());
 
-                    // Descifrar contenido
-                    String contenidoDescifrado = FileEncryptor.decrypt(contenidoCifrado, secretKey);
+                    // Descifrar contenido binario
+                    byte[] contenidoDescifrado = FileEncryptor.decryptBytes(contenidoCifrado, secretKey);
 
                     // Guardar el archivo descifrado
                     String nuevoNombre = archivoSeleccionado.getName().replace(".encrypted", "_descifrado.txt");
                     File archivoDescifrado = new File(archivoSeleccionado.getParent(), nuevoNombre);
-                    Files.write(archivoDescifrado.toPath(), contenidoDescifrado.getBytes());
+                    Files.write(archivoDescifrado.toPath(), contenidoDescifrado);
 
                     // Mostrar mensaje de éxito
                     mostrarInformacion("Desencriptación completada", "Archivo desencriptado correctamente.");
@@ -207,6 +207,9 @@ public class Interface_Controller implements Initializable {
                 } else if (extension.equalsIgnoreCase("txt")) {
                     TextFileParser parser = new TextFileParser(archivoSeleccionado);
                     contenido = parser.getTextContent();
+                }else if (extension.equalsIgnoreCase("docx")) {
+                    DOCXParser parser = new DOCXParser(archivoSeleccionado);
+                    contenido = parser.parse();
                 } else {
                     throw new IllegalArgumentException("Formato de archivo no soportado.");
                 }

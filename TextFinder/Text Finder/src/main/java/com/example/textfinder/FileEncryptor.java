@@ -78,4 +78,10 @@ public class FileEncryptor {
             System.out.println("Clave de cifrado: " + Base64.getEncoder().encodeToString(secretKey.getEncoded()));
         }
     }
+
+    public static byte[] decryptBytes(byte[] encryptedData, SecretKey key) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES");
+        cipher.init(Cipher.DECRYPT_MODE, key);
+        return cipher.doFinal(encryptedData);
+    }
 }
